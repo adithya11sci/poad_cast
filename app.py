@@ -39,11 +39,27 @@ def get_groq_client():
     return _client
 
 # Available voices for TTS (Edge-TTS Neural Voices)
-# Male: en-US-GuyNeural (deep male), en-GB-RyanNeural (British male)
-# Female: en-US-JennyNeural (female), en-US-AriaNeural (expressive female)
-VOICES = {
-    "teacher": "en-US-GuyNeural",      # Male voice for teacher
-    "student": "en-US-JennyNeural"     # Female voice for student
+LANGUAGE_VOICES = {
+    "en": {
+        "teacher": "en-US-GuyNeural",      # Male
+        "student": "en-US-JennyNeural"     # Female
+    },
+    "hi": {
+        "teacher": "hi-IN-MadhurNeural",   # Male
+        "student": "hi-IN-SwaraNeural"     # Female
+    },
+    "es": {
+        "teacher": "es-MX-JorgeNeural",    # Male
+        "student": "es-MX-DaliaNeural"     # Female
+    },
+    "fr": {
+        "teacher": "fr-FR-HenriNeural",    # Male
+        "student": "fr-FR-DeniseNeural"    # Female
+    },
+    "de": {
+        "teacher": "de-DE-ConradNeural",   # Male
+        "student": "de-DE-KatjaNeural"     # Female
+    }
 }
 
 def extract_text_from_pdf(pdf_path: str) -> str:
@@ -59,10 +75,20 @@ def extract_text_from_pdf(pdf_path: str) -> str:
     return text.strip()
 
 
-def generate_podcast_script(pdf_content: str) -> dict:
+def generate_podcast_script(pdf_content: str, language: str = "en") -> dict:
     """Generate a student-teacher conversation script from PDF content using Groq."""
     
-    system_prompt = """You are an expert educational podcast scriptwriter. Your task is to convert educational content into an engaging, natural conversation between a TEACHER (experienced, knowledgeable, patient) and a STUDENT (curious, asking good questions, seeking clarification).
+    # Map language codes to full names for the prompt
+    lang_names = {
+        "en": "English",
+        "hi": "Hindi",
+        "es": "Spanish",
+        "fr": "French",
+        "de": "German"
+    }
+    target_language = lang_names.get(language, "English")
+    
+    system_prompt = f"""You are an expert educational podcast scriptwriter. Your task is to convert educational content into an engaging, natural conversation between a TEACHER (experienced, knowledgeable, patient) and a STUDENT (curious, asking good questions, seeking clarification).
 
 Guidelines:
 1. Make the conversation NATURAL and ENGAGING - like a real tutoring session
@@ -73,27 +99,28 @@ Guidelines:
 6. The conversation should flow naturally, not feel scripted
 7. Include about 8-12 exchanges between teacher and student
 8. Each response should be 1-3 sentences for natural speech rhythm
+9. STRICTLY output the conversation in {target_language} language.
 
 Output your response as a valid JSON object with this exact structure:
-{
+{{
     "title": "Podcast episode title",
     "summary": "Brief 2-3 sentence summary of what this episode covers",
     "conversation": [
-        {"speaker": "teacher", "text": "dialogue here..."},
-        {"speaker": "student", "text": "dialogue here..."},
+        {{"speaker": "teacher", "text": "dialogue here..."}},
+        {{"speaker": "student", "text": "dialogue here..."}},
         ...
     ]
-}
+}}
 
 IMPORTANT: Return ONLY the JSON object, no other text."""
 
-    user_prompt = f"""Convert the following educational content into an engaging student-teacher podcast conversation:
+    user_prompt = f"""Convert the following educational content into an engaging student-teacher podcast conversation in {target_language}:
 
 ---
 {pdf_content[:12000]}  
 ---
 
-Remember to make it natural, educational, and engaging. Output only valid JSON."""
+Remember to make it natural, educational, and engaging. Output only valid JSON in {target_language}."""
 
     try:
         completion = get_groq_client().chat.completions.create(
@@ -133,10 +160,12 @@ async def generate_audio_async(text: str, voice: str, output_file: str):
     communicate = edge_tts.Communicate(text, voice)
     await communicate.save(output_file)
 
-def generate_audio_for_dialogue(text: str, speaker: str, output_file: str) -> str:
+def generate_audio_for_dialogue(text: str, speaker: str, output_file: str, language: str = "en") -> str:
     """Generate audio for a single dialogue using Edge TTS."""
     
-    voice = VOICES.get(speaker, VOICES["teacher"])
+    # Get voices for the specified language, default to English if not found
+    lang_voices = LANGUAGE_VOICES.get(language, LANGUAGE_VOICES["en"])
+    voice = lang_voices.get(speaker, lang_voices["teacher"])
     
     try:
         # Run the async function
@@ -147,7 +176,7 @@ def generate_audio_for_dialogue(text: str, speaker: str, output_file: str) -> st
         raise Exception(f"Error generating audio: {str(e)}")
 
 
-def generate_full_podcast(script: dict, output_path: str) -> str:
+def generate_full_podcast(script: dict, output_path: str, language: str = "en") -> str:
     """Generate the full podcast audio from the script."""
     
     from pydub import AudioSegment
@@ -176,7 +205,7 @@ def generate_full_podcast(script: dict, output_path: str) -> str:
         try:
             # Generate audio for this dialogue to a temp file
             temp_file = os_module.path.join(temp_dir, f"dialogue_{i}.mp3")
-            generate_audio_for_dialogue(text, speaker, temp_file)
+            generate_audio_for_dialogue(text, speaker, temp_file, language)
             
             # Load the audio file
             audio_segment = AudioSegment.from_mp3(temp_file)
@@ -259,6 +288,7 @@ def generate_script():
     
     data = request.json
     filename = data.get('filename')
+    language = data.get('language', 'en')
     
     if not filename:
         return jsonify({"error": "No filename provided"}), 400
@@ -273,7 +303,7 @@ def generate_script():
         pdf_text = extract_text_from_pdf(filepath)
         
         # Generate the script
-        script = generate_podcast_script(pdf_text)
+        script = generate_podcast_script(pdf_text, language)
         
         return jsonify({
             "success": True,
@@ -291,6 +321,7 @@ def generate_audio():
     data = request.json
     script = data.get('script')
     filename = data.get('filename', 'podcast')
+    language = data.get('language', 'en')
     
     if not script:
         return jsonify({"error": "No script provided"}), 400
@@ -301,7 +332,7 @@ def generate_audio():
         output_path = os.path.join(app.config['OUTPUT_FOLDER'], output_filename)
         
         # Generate the full podcast audio
-        generate_full_podcast(script, output_path)
+        generate_full_podcast(script, output_path, language)
         
         return jsonify({
             "success": True,
