@@ -12,7 +12,7 @@ Transform your PDF documents into engaging student-teacher podcast conversations
 - **🤖 AI Script Generation**: Uses Groq's LLaMA 3.3 70B to create natural conversations
 - **🎧 Text-to-Speech**: Converts the script to audio with distinct voices for teacher and student
 - **💫 Premium UI**: Beautiful, modern interface with animations and glassmorphism design
-- **🌍 Multi-language Support**: Generate podcasts in English, Hindi, Spanish, French, and German
+- **🌍 Multi-language Support**: Generate podcasts in English, Hindi, Spanish, French, German, and Tamil
 - **📥 Download Audio**: Get your podcast as an MP3 file
 
 ## 🚀 Quick Start

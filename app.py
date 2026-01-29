@@ -59,6 +59,10 @@ LANGUAGE_VOICES = {
     "de": {
         "teacher": "de-DE-ConradNeural",   # Male
         "student": "de-DE-KatjaNeural"     # Female
+    },
+    "ta": {
+        "teacher": "ta-IN-ValluvarNeural", # Male
+        "student": "ta-IN-PallaviNeural"   # Female
     }
 }
 
@@ -84,7 +88,8 @@ def generate_podcast_script(pdf_content: str, language: str = "en") -> dict:
         "hi": "Hindi",
         "es": "Spanish",
         "fr": "French",
-        "de": "German"
+        "de": "German",
+        "ta": "Tamil"
     }
     target_language = lang_names.get(language, "English")
     
